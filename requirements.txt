@@ -1,0 +1,4 @@
+# Wspólne zależności projektu. PyTorch instaluj z właściwego pliku poniżej:
+# CPU:  python -m pip install -r requirements-cpu.txt
+numpy
+Pillow

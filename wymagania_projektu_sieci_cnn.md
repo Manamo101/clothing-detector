@@ -6,7 +6,7 @@ Celem projektu jest stworzenie i wytrenowanie od zera sztucznej sieci neuronowej
 ## 2. Wymagania dotyczące Architektury Sieci
 Zamiast korzystać z ciężkich, gotowych architektur (takich jak pełne VGG16, które jest zbyt duże i wolne do trenowania od zera), sieć zostanie zbudowana jako **Custom CNN** (własna konwolucyjna sieć neuronowa) spełniająca warunki:
 * **Framework:** PyTorch.
-* **Wejście:** Obrazy w rozdzielczości, np. **60 x 80 pikseli**.
+* **Wejście:** Obrazy o szerokości **60** i wysokości **80 pikseli**.
 * **Warstwy Liniowe (Fully Connected):** Ograniczone do minimum – sieć ma posiadać **tylko jedną warstwę liniową** na samym końcu (odpowiadającą za klasyfikację).
 * **Ekstrakcja cech:** Oparta na blokach konwolucyjnych i warstwach *Max Pooling* (wzorowanych na architekturze VGG), które drastycznie zmniejszą wymiary przestrzenne obrazu przed trafieniem do jedynej warstwy liniowej.
 * **Szybkość:** Zastosowane odchudzenie architektury ma zagwarantować szybki czas trenowania (od kilkunastu minut do maksymalnie kilku godzin) w darmowym środowisku chmurowym.
@@ -69,7 +69,7 @@ python .\train.py `
   --device auto
 ```
 
-Model używa wejścia 60 x 80 pikseli, bloków konwolucyjnych z Max Pooling
+Model używa wejścia o szerokości 60 i wysokości 80 pikseli, bloków konwolucyjnych z Max Pooling
 i dokładnie jednej warstwy liniowej na wyjściu. Najlepsze wagi są zapisywane
 w `runs/clothing_cnn/best_model.pt`, a wyniki epok w `history.json`.
 Argument `--device cuda` wymusza GPU; `--device auto` wybiera GPU, jeśli jest

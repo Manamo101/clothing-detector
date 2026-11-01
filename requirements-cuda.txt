@@ -1,0 +1,3 @@
+-r requirements.txt
+# Zależności specyficzne dla CUDA. PyTorch instaluj z właściwego pliku poniżej:
+# https://pytorch.org/get-started/locally/
