@@ -9,6 +9,8 @@ import shutil
 from collections import defaultdict
 from pathlib import Path
 
+from PIL import Image
+
 LABELS = ("Shirts", "Jeans", "Caps", "Backpacks", "Watches")
 IMAGE_EXTENSIONS = {".jpg"}
 SPLITS = ("train", "val", "test")
@@ -132,8 +134,9 @@ def split_records(
 def copy_splits(
     split_records_by_label: dict[str, dict[str, list[Path]]],
     output_dir: Path,
+    resize_max_size: int | None = None,
 ) -> dict[str, int]:
-    """Tworzy strukturę katalogów i kopiuje zdjęcia."""
+    """Tworzy strukturę katalogów i kopiuje lub skaluje zdjęcia."""
     counts = {split: 0 for split in SPLITS}
     for label in LABELS:
         split_paths = split_records_by_label.get(
@@ -144,7 +147,15 @@ def copy_splits(
             target_dir.mkdir(parents=True, exist_ok=True)
             for source_path in paths:
                 target_path = target_dir / source_path.name
-                shutil.copy2(source_path, target_path)
+                if resize_max_size is None:
+                    shutil.copy2(source_path, target_path)
+                else:
+                    with Image.open(source_path) as image:
+                        image.thumbnail(
+                            (resize_max_size, resize_max_size),
+                            Image.Resampling.LANCZOS,
+                        )
+                        image.save(target_path, quality=95, optimize=True)
                 counts[split] += 1
     return counts
 
@@ -164,6 +175,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--seed", type=int, default=42, help="Ziarno losowania (domyślnie: 42)."
     )
+    parser.add_argument(
+        "--resize",
+        type=int,
+        metavar="PIXELS",
+        help=(
+            "Maksymalny rozmiar dłuższego boku zdjęcia w pikselach; "
+            "zachowuje proporcje i nie powiększa zdjęć."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -173,6 +193,8 @@ def main() -> None:
         raise NotADirectoryError(f"Folder zdjęć nie istnieje: {args.images}")
     if not args.csv_path.is_file():
         raise FileNotFoundError(f"Plik CSV nie istnieje: {args.csv_path}")
+    if args.resize is not None and args.resize <= 0:
+        raise ValueError("Wartość --resize musi być większa od zera.")
     if args.output.exists() and any(args.output.iterdir()):
         raise FileExistsError(
             f"Folder wynikowy nie jest pusty: {args.output}. "
@@ -183,7 +205,7 @@ def main() -> None:
     print("Indeksowanie zdjęć i odczyt CSV...", flush=True)
     records = read_records(args.csv_path, args.images)
     split_records_by_label = split_records(records, args.seed)
-    counts = copy_splits(split_records_by_label, args.output)
+    counts = copy_splits(split_records_by_label, args.output, args.resize)
 
     print(f"Gotowe. Zapisano dane w: {args.output.resolve()}")
     for split in SPLITS:

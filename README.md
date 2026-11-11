@@ -105,6 +105,20 @@ python .\podziel_zbior.py `
   --seed 42
 ```
 
+Przy zdjęciach o dużej rozdzielczości można podczas tworzenia zbioru zmniejszyć
+maksymalny bok każdego zdjęcia, zachowując jego proporcje:
+
+```powershell
+python .\podziel_zbior.py `
+  --images "C:\sciezka\do\zdjec" `
+  --csv "C:\sciezka\do\plik.csv" `
+  --output ".\dataset" `
+  --resize 1024
+```
+
+Opcja `--resize` nie powiększa zdjęć, których dłuższy bok jest już mniejszy od
+podanej wartości. Bez tej opcji zdjęcia są kopiowane bez zmian.
+
 CSV musi zawierać:
 
 - nazwę pliku lub identyfikator zdjęcia w kolumnie 1 (`id`),
