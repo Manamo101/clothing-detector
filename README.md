@@ -12,8 +12,8 @@ Model rozpoznaje pięć klas:
 ## Założenia
 
 - Model jest trenowany od zera — nie używa transfer learningu ani gotowych wag.
-- Wejściowy obraz jest skalowany do rozmiaru szerokość `60` x wysokość `80`
-  pikseli. W kodzie torchvision jest to zapisane jako `(80, 60)`, ponieważ
+- Wejściowy obraz jest skalowany do rozmiaru szerokość `192` x wysokość `256`
+  pikseli. W kodzie torchvision jest to zapisane jako `(256, 192)`, ponieważ
   używa kolejności `(wysokość, szerokość)`.
 - Sieć jest lekką, własną architekturą CNN, opartą na blokach konwolucyjnych
   i `MaxPool2d`.
@@ -134,6 +134,7 @@ python .\train.py `
   --output ".\runs\clothing_cnn" `
   --epochs 30 `
   --batch-size 64 `
+  --image-size 192 256 `
   --device auto
 ```
 
@@ -156,6 +157,7 @@ Najważniejsze opcje:
 | `--patience` | `7` | Liczba epok bez poprawy przed early stopping |
 | `--workers` | `2` | Liczba procesów ładowania danych |
 | `--seed` | `42` | Powtarzalność treningu |
+| `--image-size` | `192 256` | Szerokość i wysokość obrazu wejściowego w pikselach |
 | `--device` | `auto` | `auto`, `cpu` albo `cuda` |
 
 W folderze wynikowym zostaną zapisane:

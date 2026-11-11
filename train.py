@@ -17,8 +17,8 @@ from torchvision import datasets, transforms
 
 from model import ClothingCNN
 
-# torchvision uses (height, width); the project uses width=60 and height=80.
-IMAGE_SIZE = (80, 60)
+# torchvision uses (height, width); CLI values are provided as width, height.
+DEFAULT_IMAGE_SIZE = (256, 192)
 DEFAULT_CLASSES = ("Backpacks", "Cups", "Jeans", "Shirts", "Watches")
 
 
@@ -30,10 +30,12 @@ def set_seed(seed: int) -> None:
         torch.cuda.manual_seed_all(seed)
 
 
-def create_datasets(dataset_dir: Path) -> tuple[Any, Any, Any]:
+def create_datasets(
+    dataset_dir: Path, image_size: tuple[int, int]
+) -> tuple[Any, Any, Any]:
     train_transform = transforms.Compose(
         [
-            transforms.Resize(IMAGE_SIZE),
+            transforms.Resize(image_size),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
@@ -41,7 +43,7 @@ def create_datasets(dataset_dir: Path) -> tuple[Any, Any, Any]:
     )
     evaluation_transform = transforms.Compose(
         [
-            transforms.Resize(IMAGE_SIZE),
+            transforms.Resize(image_size),
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ]
@@ -98,13 +100,18 @@ def run_epoch(
 
 
 def save_checkpoint(
-    path: Path, model: nn.Module, classes: list[str], epoch: int, val_accuracy: float
+    path: Path,
+    model: nn.Module,
+    classes: list[str],
+    image_size: tuple[int, int],
+    epoch: int,
+    val_accuracy: float,
 ) -> None:
     torch.save(
         {
             "model_state": model.state_dict(),
             "classes": classes,
-            "image_size": IMAGE_SIZE,
+            "image_size": image_size,
             "epoch": epoch,
             "val_accuracy": val_accuracy,
         },
@@ -123,6 +130,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--workers", type=int, default=2)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
+    parser.add_argument(
+        "--image-size",
+        nargs=2,
+        type=int,
+        metavar=("WIDTH", "HEIGHT"),
+        default=(DEFAULT_IMAGE_SIZE[1], DEFAULT_IMAGE_SIZE[0]),
+        help=(
+            "Rozmiar wejściowy obrazu jako szerokość wysokość "
+            "(domyślnie: 192 256)."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -130,6 +148,9 @@ def main() -> None:
     args = parse_args()
     if args.epochs < 1 or args.batch_size < 1 or args.workers < 0:
         raise ValueError("epochs i batch-size muszą być dodatnie, workers nieujemne.")
+    if any(size < 1 for size in args.image_size):
+        raise ValueError("Szerokość i wysokość obrazu muszą być dodatnie.")
+    image_size = (args.image_size[1], args.image_size[0])
     set_seed(args.seed)
     device = torch.device(
         "cuda" if args.device == "auto" and torch.cuda.is_available() else args.device
@@ -139,7 +160,7 @@ def main() -> None:
     if device.type == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("Wybrano CUDA, ale GPU nie jest dostępne.")
 
-    train_set, val_set, test_set = create_datasets(args.dataset)
+    train_set, val_set, test_set = create_datasets(args.dataset, image_size)
     train_loader = make_loader(train_set, args.batch_size, args.workers, True)
     val_loader = make_loader(val_set, args.batch_size, args.workers, False)
     test_loader = make_loader(test_set, args.batch_size, args.workers, False)
@@ -183,6 +204,7 @@ def main() -> None:
                 args.output / "best_model.pt",
                 model,
                 train_set.classes,
+                image_size,
                 epoch,
                 val_accuracy,
             )
