@@ -181,9 +181,15 @@ To analyze a CSV with a different name, pass its path:
 ```
 
 The script reads the semicolon-delimited `filename;real;predicted` columns and
-displays one-vs-rest confusion matrices for every label found in either column.
-Colab normally includes `matplotlib` and `scikit-learn`; if they are missing,
-install them with `!pip install matplotlib scikit-learn`.
+displays a confusion matrix plus one-vs-rest precision, recall, F1, accuracy,
+and specificity for every label found in either column. Rows are actual labels,
+columns are predicted labels, and each cell shows the count. It also prints
+micro-averaged precision, recall, and F1 from the summed label counts, along
+with overall accuracy and pooled specificity. Macro metrics are the mean of
+the per-label values. Undefined metrics with a zero denominator are reported
+as `0.0000`. Colab normally includes
+`matplotlib` and `scikit-learn`; if they are missing, install them with
+`!pip install matplotlib scikit-learn`.
 
 ## Sliding window
 

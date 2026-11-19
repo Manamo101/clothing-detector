@@ -1,6 +1,5 @@
 import argparse
 import csv
-import math
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -39,64 +38,114 @@ def load_classifications(csv_path):
     return rows
 
 
-def build_confusion_matrices(rows):
+def build_confusion_matrix(rows):
     if not rows:
         raise ValueError("No classification rows to analyze")
 
     classes = sorted({label for real, predicted in rows for label in (real, predicted)})
-    return {
-        label: confusion_matrix(
-            [real == label for real, _ in rows],
-            [predicted == label for _, predicted in rows],
-            labels=[False, True],
-        )
-        for label in classes
+    matrix = confusion_matrix(
+        [real for real, _ in rows],
+        [predicted for _, predicted in rows],
+        labels=classes,
+    )
+    return classes, matrix
+
+
+def calculate_metrics(matrix, classes=None):
+    """Calculate per-class, micro and macro metrics; undefined ratios are zero."""
+    total = int(matrix.sum())
+    if not total:
+        raise ValueError("No classifications to analyze")
+
+    if classes is None:
+        classes = list(range(len(matrix)))
+    if len(classes) != len(matrix):
+        raise ValueError("The number of class labels must match the matrix dimensions")
+
+    counts = []
+    for index in range(len(matrix)):
+        tp = int(matrix[index, index])
+        fp = int(matrix[:, index].sum()) - tp
+        fn = int(matrix[index, :].sum()) - tp
+        tn = total - tp - fp - fn
+        counts.append((tp, fp, fn, tn))
+
+    def metrics(tp, fp, fn, tn):
+        def ratio(numerator, denominator):
+            return numerator / denominator if denominator else 0.0
+
+        return {
+            "precision": ratio(tp, tp + fp),
+            "recall": ratio(tp, tp + fn),
+            "accuracy": ratio(tp + tn, tp + fp + fn + tn),
+            "specificity": ratio(tn, tn + fp),
+            "f1": ratio(2 * tp, 2 * tp + fp + fn),
+        }
+
+    per_class = {
+        label: metrics(*count) for label, count in zip(classes, counts)
     }
+    micro = metrics(*(sum(values) for values in zip(*counts)))
+    correct = sum(matrix[index, index] for index in range(len(matrix)))
+    micro["accuracy"] = correct / total
+    macro = {name: sum(item[name] for item in per_class.values()) / len(per_class)
+             for name in micro}
+    return {"per_class": per_class, "micro": micro, "macro": macro}
 
 
-def display_confusion_matrices(matrices):
-    if not matrices:
-        raise ValueError("No confusion matrices to display")
-
-    columns = min(3, len(matrices))
-    rows = math.ceil(len(matrices) / columns)
-    figure, axes = plt.subplots(rows, columns, figsize=(4 * columns, 4 * rows), squeeze=False)
-
-    for axis, (label, matrix) in zip(axes.flat, matrices.items()):
-        axis.imshow(matrix, cmap="Blues")
-        axis.set(
-            xticks=[0, 1],
-            yticks=[0, 1],
-            xticklabels=["Negative", "Positive"],
-            yticklabels=["Negative", "Positive"],
-            xlabel="Predicted",
-            ylabel="Actual",
-            title=label,
+def display_metrics(metrics):
+    metric_names = ("precision", "recall", "f1", "accuracy", "specificity")
+    print("Per-label (one-vs-rest):")
+    print(f"{'Label':<20} " + " ".join(f"{name:>12}" for name in metric_names))
+    for label, values in metrics["per_class"].items():
+        print(
+            f"{str(label):<20} "
+            + " ".join(f"{values[name]:>12.4f}" for name in metric_names)
         )
-        threshold = matrix.max() / 2
-        for actual in range(2):
-            for predicted in range(2):
-                value = matrix[actual, predicted]
-                axis.text(
-                    predicted,
-                    actual,
-                    str(value),
-                    ha="center",
-                    va="center",
-                    color="white" if value > threshold else "black",
-                )
 
-    for axis in axes.flat[len(matrices):]:
-        axis.set_visible(False)
+    for average in ("micro", "macro"):
+        print(f"{average.capitalize()} (one-vs-rest):")
+        for name in metric_names:
+            print(f"  {name}: {metrics[average][name]:.4f}")
+
+
+def display_confusion_matrix(classes, matrix):
+    if not classes:
+        raise ValueError("No confusion matrix to display")
+
+    figure, axis = plt.subplots(figsize=(max(5, len(classes)), max(5, len(classes))))
+    axis.imshow(matrix, cmap="Blues")
+    axis.set(
+        xticks=range(len(classes)),
+        yticks=range(len(classes)),
+        xticklabels=classes,
+        yticklabels=classes,
+        xlabel="Predicted",
+        ylabel="Actual",
+        title="Confusion matrix",
+    )
+    plt.setp(axis.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+    threshold = matrix.max() / 2
+    for actual in range(len(classes)):
+        for predicted in range(len(classes)):
+            value = matrix[actual, predicted]
+            axis.text(
+                predicted,
+                actual,
+                str(value),
+                ha="center",
+                va="center",
+                color="white" if value > threshold else "black",
+            )
 
     figure.tight_layout()
     plt.show()
-    return figure, axes
+    return figure, axis
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Display one-vs-rest confusion matrices from a classification CSV."
+        description="Display a confusion matrix from a classification CSV."
     )
     parser.add_argument(
         "csv_path",
@@ -112,7 +161,9 @@ def main():
     except (OSError, csv.Error, ValueError) as error:
         parser.error(str(error))
 
-    display_confusion_matrices(build_confusion_matrices(rows))
+    classes, matrix = build_confusion_matrix(rows)
+    display_metrics(calculate_metrics(matrix, classes))
+    display_confusion_matrix(classes, matrix)
     return 0
 
 
