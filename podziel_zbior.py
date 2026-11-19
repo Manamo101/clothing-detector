@@ -112,7 +112,7 @@ def find_image(
 
 
 def split_records(
-    records: dict[str, list[Path]], seed: int
+    records: dict[str, list[Path]], seed: int, truncate: int = -1
 ) -> dict[str, dict[str, list[Path]]]:
     """Dzieli zdjęcia osobno w każdej klasie, zachowując stratyfikację."""
     rng = random.Random(seed)
@@ -121,6 +121,7 @@ def split_records(
     for label, paths in records.items():
         shuffled = list(paths)
         rng.shuffle(shuffled)
+        shuffled = shuffled[: truncate] if truncate > 0 else shuffled
         train_end = int(len(shuffled) * 0.8)
         val_end = train_end + int(len(shuffled) * 0.1)
         result[label] = {
@@ -167,6 +168,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--images", type=Path, required=True, help="Folder ze zdjęciami.")
     parser.add_argument("--csv", dest="csv_path", type=Path, required=True)
     parser.add_argument(
+        "--truncate", type=int, default=-1, help="truncate number of images on each category"
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=Path("dataset"),
@@ -204,7 +208,7 @@ def main() -> None:
 
     print("Indeksowanie zdjęć i odczyt CSV...", flush=True)
     records = read_records(args.csv_path, args.images)
-    split_records_by_label = split_records(records, args.seed)
+    split_records_by_label = split_records(records, args.seed, args.truncate)
     counts = copy_splits(split_records_by_label, args.output, args.resize)
 
     print(f"Gotowe. Zapisano dane w: {args.output.resolve()}")

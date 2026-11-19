@@ -2,3 +2,6 @@
 # CPU:  python -m pip install -r requirements-cpu.txt
 numpy
 Pillow
+kagglehub
+matplotlib
+sklearn

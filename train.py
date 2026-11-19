@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import random
 from pathlib import Path
@@ -20,6 +21,12 @@ from model import ClothingCNN
 # torchvision uses (height, width); CLI values are provided as width, height.
 DEFAULT_IMAGE_SIZE = (256, 192)
 DEFAULT_CLASSES = ("Backpacks", "Cups", "Jeans", "Shirts", "Watches")
+
+
+class TestImageFolder(datasets.ImageFolder):
+    def __getitem__(self, index: int) -> tuple[Any, int, str]:
+        image, label = super().__getitem__(index)
+        return image, label, Path(self.samples[index][0]).name
 
 
 def set_seed(seed: int) -> None:
@@ -50,7 +57,7 @@ def create_datasets(
     )
     train_set = datasets.ImageFolder(dataset_dir / "train", train_transform)
     val_set = datasets.ImageFolder(dataset_dir / "val", evaluation_transform)
-    test_set = datasets.ImageFolder(dataset_dir / "test", evaluation_transform)
+    test_set = TestImageFolder(dataset_dir / "test", evaluation_transform)
     if train_set.classes != val_set.classes or train_set.classes != test_set.classes:
         raise ValueError("Foldery train, val i test muszą zawierać te same klasy.")
     if not train_set or not val_set or not test_set:
@@ -75,16 +82,19 @@ def run_epoch(
     criterion: nn.Module,
     device: torch.device,
     optimizer: torch.optim.Optimizer | None = None,
+    classification_path: Path | None = None,
 ) -> tuple[float, float]:
     training = optimizer is not None
     model.train(training)
     total_loss = 0.0
     correct = 0
     total = 0
+    classifications = []
     context = torch.enable_grad() if training else torch.inference_mode()
 
     with context:
-        for images, labels in loader:
+        for batch in loader:
+            images, labels = batch[:2]
             images, labels = images.to(device), labels.to(device)
             if training:
                 optimizer.zero_grad(set_to_none=True)
@@ -94,8 +104,22 @@ def run_epoch(
                 loss.backward()
                 optimizer.step()
             total_loss += loss.item() * labels.size(0)
-            correct += (logits.argmax(dim=1) == labels).sum().item()
+            predictions = logits.argmax(dim=1)
+            correct += (predictions == labels).sum().item()
             total += labels.size(0)
+            if classification_path is not None:
+                classes = loader.dataset.classes
+                classifications.extend(
+                    (filename, classes[label], classes[prediction])
+                    for filename, label, prediction in zip(
+                        batch[2], labels.tolist(), predictions.tolist()
+                    )
+                )
+    if classification_path is not None:
+        with classification_path.open("w", encoding="utf-8", newline="") as csv_file:
+            writer = csv.writer(csv_file, delimiter=";")
+            writer.writerow(("filename", "real", "predicted"))
+            writer.writerows(classifications)
     return total_loss / total, correct / total
 
 
@@ -216,7 +240,10 @@ def main() -> None:
 
     checkpoint = torch.load(args.output / "best_model.pt", map_location=device)
     model.load_state_dict(checkpoint["model_state"])
-    test_loss, test_accuracy = run_epoch(model, test_loader, criterion, device)
+    test_loss, test_accuracy = run_epoch(
+        model, test_loader, criterion, device,
+        classification_path=args.output / "calssification.csv",
+    )
     results = {
         "test_loss": test_loss,
         "test_accuracy": test_accuracy,

@@ -165,6 +165,26 @@ W folderze wynikowym zostaną zapisane:
 - `best_model.pt` — checkpoint z najlepszą dokładnością walidacyjną,
 - `history.json` — historia treningu oraz wynik na zbiorze testowym.
 
+## Confusion matrices
+
+`train.py` saves test predictions to `calssification.csv`. In Google Colab,
+upload that CSV and `confusion_matrix.py` to the runtime, then run:
+
+```python
+%run confusion_matrix.py
+```
+
+To analyze a CSV with a different name, pass its path:
+
+```python
+%run confusion_matrix.py /content/my_classification.csv
+```
+
+The script reads the semicolon-delimited `filename;real;predicted` columns and
+displays one-vs-rest confusion matrices for every label found in either column.
+Colab normally includes `matplotlib` and `scikit-learn`; if they are missing,
+install them with `!pip install matplotlib scikit-learn`.
+
 ## Sliding window
 
 Po wytrenowaniu modelu można przeskanować większe zdjęcie:
